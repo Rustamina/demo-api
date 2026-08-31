@@ -1,0 +1,8 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: demo-api-config
+  namespace: dev
+data:
+  GREETING: "Привет из кластера"
+  LOG_LEVEL: "INFO"

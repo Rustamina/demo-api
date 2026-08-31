@@ -1,0 +1,110 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-api
+  namespace: dev
+  labels:
+    app: demo-api
+spec:
+  replicas: 2
+
+  # По этому селектору Deployment находит свои поды.
+  # Он иммутабелен: изменить после создания нельзя, только пересоздать.
+  selector:
+    matchLabels:
+      app: demo-api
+
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0   # ни одного пода не гасим, пока новый не готов
+      maxSurge: 1         # разрешаем один лишний под во время обновления
+
+  template:
+    metadata:
+      labels:
+        app: demo-api     # должно совпадать с selector выше
+    spec:
+      # Учётные данные для приватного GitLab Registry.
+      imagePullSecrets:
+        - name: gitlab-registry
+
+      # Настройки безопасности на уровне пода.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+
+      containers:
+        - name: demo-api
+          image: registry.gitlab.com/khrustik/demo-api:1.0.0
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          # Все ключи ConfigMap станут переменными окружения.
+          envFrom:
+            - configMapRef:
+                name: demo-api-config
+
+          env:
+            - name: APP_VERSION
+              value: "1.0.0"
+
+            # Downward API: под узнаёт собственные метаданные.
+            # Изнутри контейнера эта информация иначе недоступна.
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+          resources:
+            requests:          # столько гарантированно резервирует планировщик
+              cpu: 50m
+              memory: 64Mi
+            limits:            # выше этого — throttling по CPU, OOMKill по памяти
+              cpu: 200m
+              memory: 128Mi
+
+          # Liveness: жив ли процесс. Провалилась — контейнер перезапускается.
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 2
+            failureThreshold: 3
+
+          # Readiness: готов ли принимать трафик. Провалилась — под выпадает
+          # из EndpointSlice, но продолжает работать.
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
