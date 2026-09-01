@@ -1,0 +1,100 @@
+# Значения по умолчанию для demo-api.
+# Всё, что может отличаться между окружениями, живёт здесь,
+# а не в шаблонах.
+
+replicaCount: 2
+
+image:
+  repository: registry.gitlab.com/khrustik/demo-api
+  # Если пусто — подставится .Chart.appVersion. Так тег приложения
+  # и метаданные чарта не разъезжаются.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Секреты для доступа к приватному реестру.
+imagePullSecrets:
+  - name: gitlab-registry
+
+# Переопределяют имена, которые генерирует _helpers.tpl.
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+# Конфигурация приложения. Попадёт в ConfigMap и оттуда
+# в переменные окружения контейнера.
+config:
+  GREETING: "Привет из кластера"
+  LOG_LEVEL: "INFO"
+
+# Дополнительные переменные окружения, если нужны разово.
+extraEnv: []
+  # - name: FEATURE_FLAG
+  #   value: "on"
+
+service:
+  type: ClusterIP
+  port: 80
+
+ingress:
+  enabled: false
+  className: nginx
+  annotations: {}
+  hosts:
+    - host: demo-api.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  requests:
+    cpu: 50m
+    memory: 64Mi
+  limits:
+    cpu: 200m
+    memory: 128Mi
+
+livenessProbe:
+  path: /healthz
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 2
+  failureThreshold: 3
+
+readinessProbe:
+  path: /readyz
+  initialDelaySeconds: 3
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 2
+
+# Настройки безопасности пода.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# Настройки безопасности контейнера.
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 1
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
+

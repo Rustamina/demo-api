@@ -1,0 +1,151 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  {{- /* include вызывает именованный шаблон из _helpers.tpl.
+         Результат — строка, поэтому его можно использовать
+         прямо как значение поля. */}}
+  name: {{ include "demo-api.fullname" . }}
+  labels:
+    {{- /* nindent 4: добавить перевод строки и сдвинуть весь блок
+           на 4 пробела. Именно nindent, а не indent — потому что
+           нужен перенос перед первой строкой.
+           Дефис в {{- съедает пробелы слева, иначе останется
+           пустая строка и YAML сломается. */}}
+    {{- include "demo-api.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+
+  strategy:
+    {{- /* toYaml превращает структуру из values в YAML-текст.
+           Так можно прокинуть целый блок, не описывая каждое поле. */}}
+    {{- toYaml .Values.strategy | nindent 4 }}
+
+  selector:
+    matchLabels:
+      {{- include "demo-api.selectorLabels" . | nindent 6 }}
+
+  template:
+    metadata:
+      annotations:
+        {{- /* CHECKSUM-АННОТАЦИЯ — важный приём.
+
+               Переменные окружения из ConfigMap НЕ обновляются
+               в работающем поде. Изменил конфиг — поды продолжают
+               жить со старым.
+
+               Решение: считаем хеш отрендеренного ConfigMap и кладём
+               в аннотацию. Изменился конфиг → изменился хеш →
+               изменился шаблон пода → Deployment делает rolling update.
+
+               $ — корневой контекст. Внутри range и with контекст
+               подменяется, и $ нужен, чтобы добраться до .Values. */}}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- /* with задаёт контекст: внутри блока точка означает
+               .Values.podAnnotations. Если значение пустое,
+               блок целиком пропускается — удобнее, чем if. */}}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "demo-api.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+      serviceAccountName: {{ include "demo-api.serviceAccountName" . }}
+
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+
+      containers:
+        - name: {{ .Chart.Name }}
+
+          {{- /* required падает с ошибкой, если значение пустое.
+                 Лучше явная ошибка при helm install, чем под
+                 с битым образом в кластере.
+
+                 default .Chart.AppVersion — если tag не задан,
+                 берём версию приложения из Chart.yaml. */}}
+          image: "{{ required "image.repository обязателен" .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: 8000
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: {{ include "demo-api.fullname" . }}-config
+
+          env:
+            - name: APP_VERSION
+              value: {{ .Values.image.tag | default .Chart.AppVersion | quote }}
+
+            {{- /* Downward API: под получает собственные метаданные.
+                   Изнутри контейнера они иначе недоступны. */}}
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+
+            {{- /* range — цикл. Проходим по списку extraEnv
+                   и добавляем каждый элемент как есть. */}}
+            {{- range .Values.extraEnv }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.livenessProbe.failureThreshold }}
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+            timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
+            failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
+
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+
+      {{- /* Три опциональных блока. Если в values пусто —
+             в манифест не попадут вообще. */}}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+

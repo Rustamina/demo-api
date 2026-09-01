@@ -1,0 +1,24 @@
+apiVersion: v2
+name: demo-api
+description: Учебный сервис для отработки Kubernetes, CI/CD и мониторинга
+
+# application — обычный чарт с ресурсами.
+# library — чарт без ресурсов, только переиспользуемые шаблоны.
+type: application
+
+# version — версия САМОГО ЧАРТА. Меняется при правке шаблонов.
+# Обязан быть SemVer, Helm это проверяет.
+version: 0.1.0
+
+# appVersion — версия ПРИЛОЖЕНИЯ внутри. Обычно совпадает с тегом образа.
+# В кавычках, потому что иначе YAML превратит 1.0 в число.
+# Различие version/appVersion — классический вопрос на собеседовании.
+appVersion: "1.0.0"
+
+keywords:
+  - demo
+  - fastapi
+
+maintainers:
+  - name: Rustam Khafizov
+

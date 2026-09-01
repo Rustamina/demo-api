@@ -1,0 +1,60 @@
+{{- /* Весь объект существует только при ingress.enabled: true.
+       Дефис в конце (-}}) убирает лишний перевод строки,
+       иначе манифест начнётся с пустой строки. */}}
+{{- if .Values.ingress.enabled -}}
+
+{{- /* Сохраняем значения в переменные ДО циклов.
+       Внутри range точка меняет значение на текущий элемент списка,
+       и .Values оттуда уже недоступен. Переменные с $ видны везде. */}}
+{{- $fullName := include "demo-api.fullname" . -}}
+{{- $svcPort := .Values.service.port -}}
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $fullName }}
+  labels:
+    {{- include "demo-api.labels" . | nindent 4 }}
+  {{- with .Values.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  {{- with .Values.ingress.className }}
+  {{- /* ingressClassName определяет, КАКОЙ контроллер обработает
+         это правило. В кластере их может быть несколько
+         (nginx, traefik, облачный ALB). */}}
+  ingressClassName: {{ . }}
+  {{- end }}
+
+  {{- with .Values.ingress.tls }}
+  tls:
+    {{- range . }}
+    - hosts:
+        {{- range .hosts }}
+        - {{ . | quote }}
+        {{- end }}
+      secretName: {{ .secretName }}
+    {{- end }}
+  {{- end }}
+
+  rules:
+    {{- range .Values.ingress.hosts }}
+    - host: {{ .host | quote }}
+      http:
+        paths:
+          {{- range .paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                {{- /* Здесь и нужны $fullName и $svcPort:
+                       мы внутри двух вложенных range, обычная точка
+                       указывает на элемент paths. */}}
+                name: {{ $fullName }}
+                port:
+                  number: {{ $svcPort }}
+          {{- end }}
+    {{- end }}
+{{- end }}
+
