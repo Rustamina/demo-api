@@ -1,0 +1,22 @@
+replicaCount: 3
+
+config:
+  GREETING: "Привет из PROD"
+  LOG_LEVEL: "WARNING"
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+ingress:
+  enabled: true
+  className: nginx
+  hosts:
+    - host: demo-api.local
+      paths:
+        - path: /
+          pathType: Prefix
