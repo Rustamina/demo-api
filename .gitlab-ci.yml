@@ -143,12 +143,10 @@ package:chart:
     entrypoint: [""]
   script:
     - apk add --no-cache curl
-    # Синхронизируем версию приложения в чарте с тегом образа,
-    # чтобы helm history показывал реальную версию,
-    # а не захардкоженную в Chart.yaml
-    - sed -i "s/^appVersion:.*/appVersion: \"$IMAGE_TAG\"/" chart/Chart.yaml
+    # Синхронизируем appVersion в чарте с тегом образа
+    - |
+      sed -i "s/^appVersion:.*/appVersion: \"$IMAGE_TAG\"/" chart/Chart.yaml
     - helm package ./chart --destination ./dist
-    # Публикация в GitLab Package Registry (встроенный helm-репозиторий)
     - |
       curl --fail --request POST \
         --form "chart=@$(ls ./dist/*.tgz)" \
