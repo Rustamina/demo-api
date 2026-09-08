@@ -24,7 +24,7 @@ from prometheus_client import (
 # ---------------------------------------------------------------- конфигурация
 # Значения приезжают из ConfigMap (GREETING, LOG_LEVEL) и Downward API (POD_*).
 VERSION = os.getenv("APP_VERSION", "0.0.0-dev")
-GREETING = os.getenv("GREETING", "Hello from demo-api")
+GREETING = os.getenv("GREETING", "Hello from demo-api for rebiuld test")
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
 POD_NAME = os.getenv("POD_NAME", "local")

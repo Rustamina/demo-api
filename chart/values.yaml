@@ -5,7 +5,7 @@
 replicaCount: 2
 
 image:
-  repository: registry.gitlab.com/khrustik/demo-api
+  repository: ghcr.io/rustamina/demo-api
   # Если пусто — подставится .Chart.appVersion. Так тег приложения
   # и метаданные чарта не разъезжаются.
   tag: ""
@@ -13,7 +13,7 @@ image:
 
 # Секреты для доступа к приватному реестру.
 imagePullSecrets:
-  - name: gitlab-registry
+  - name: ghcr
 
 # Переопределяют имена, которые генерирует _helpers.tpl.
 nameOverride: ""
